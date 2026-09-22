@@ -41,7 +41,7 @@ def _platform_node_relpaths():
     """
     Return node relative path
       - Linux x64:     bin/linux-x64/node
-      - Windows x86:   bin/win-x86/node.exe
+      - Windows x64:   bin/win-x64/node.exe
       - macOS x64:     bin/mac-x64/node
       - macOS arm64:   bin/mac-arm64/node
     """
@@ -51,7 +51,7 @@ def _platform_node_relpaths():
         return os.path.join("bin", "linux-x64", "node"), False
 
     if sysname == "windows":
-        return os.path.join("bin", "win-x86", "node.exe"), True
+        return os.path.join("bin", "win-x64", "node.exe"), True
 
     if sysname == "darwin":
         machine = platform.machine().lower()
