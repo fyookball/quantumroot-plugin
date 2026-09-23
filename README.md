@@ -85,7 +85,7 @@ follow the examples and add your own Libauth calls.
 When you're ready to compile the plugin, just zip it together from
 the top level folder with 
 
-`zip -r libauth_plugin.zip manifest.json libauth_plugin`
+`zip -r quantumroot_plugin.zip manifest.json quantumroot_plugin`
 
 Any one-off custom javascript files can simply be put in `libauth_plugin/scripts`,
 on the same level as hello.js.
