@@ -8,8 +8,7 @@ Please consider this work to be minimally tested and possibly insecure.
 Only use with small amounts of test funds.
 
 
-![image](https://github.com/fyookball/quantumroot-vault/blob/main/quantumroot-vault.png)
-
+![image](https://github.com/fyookball/quantumroot-plugin/blob/main/quantumroot-vault.png) 
  
 # FAQ:  
 
