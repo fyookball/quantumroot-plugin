@@ -2,14 +2,16 @@
 
 This plugin is a prototype wallet-level implementation of Quantumroot.
 
-# Warning
-
-Please consider this work to be minimally tested and possibly insecure.
-Only use with small amounts of test funds.
 
 
 ![image](https://github.com/fyookball/quantumroot-plugin/blob/main/quantumroot-vault.png) 
+
+
  
+ # Warning
+
+Please understand this work is only developer tested and relies on [Quantumroot](https://github.com/bitjson/quantumroot), a
+novel and unaudited Quantum crypto solution.
 # FAQ:  
 
 
@@ -71,10 +73,9 @@ This plugin makes use of the Quantumroot introspection spend, to spend multiple 
 
 ## What about the stuff on the Quantumroot page like "quantum safe at rest from day 1" and "retiring pre-quantum signing". 
 
-This simply means you can also technically spend from the vaults with normal Schnorr signatures if you really want to, or hide that you're using quantum
-under a script hash.  But this complication does not add value in this setting becuase you still need to put your funds in the vault.
+This refers to the Schnorr signature fallback that is available in the smart contract.  But there's really no need for it here.
+The whole point of storing UTXO in the vault is so you can spend them with Quantum-safe signatures.
  
-
 # How to Load the Plugin
 First download the plugin from the Releases section.  Then, from the Electron Cash menu, select Tools->Installed Plugins, then click "Add Plugin" and load the zip file.
 
@@ -84,7 +85,9 @@ First download the plugin from the Releases section.  Then, from the Electron Ca
 that live in the bin folder have been zipped.  You should
 unzip each of them and delete the original zip files.**
 
-Customize `libauth_bundling/service.mjs` by adding any
+This plugin is based on the [Libauth integration plugin](https://github.com/fyookball/js-libauth-integration-plugin).  The main architectural difference is that this plugin has a more complicated service layer that handles more complex data structures that were unable to be passed directly via JSON, and needs additional specific methods.
+
+As with the libauth plugin, you can customize `libauth_bundling/service.mjs` by adding any
 libauth functions you need to the list of allowed
 functions.  (This is a whitelist that provides
 a safety net.)  And, you can add any other customizations
@@ -99,13 +102,8 @@ This will generate `libauth_bundling/libauth_service.bundle.mjs`.
 Then you should copy this file from the bundling folder and
 put it into the plugin scripts folder at `quantumroot-plugin/scripts/libauth_service.bundle.mjs`.
  
-
 When you're ready to compile the plugin, just zip it together from
 the top level folder with 
 
-`zip -r quantumroot_plugin.zip manifest.json quantumroot_plugin`
+`zip -r quantumroot_plugin.zip manifest.json quantumroot_plugin` 
  
-Note: The plugin uses the libauth plugin as a basis. See: https://github.com/fyookball/js-libauth-integration-plugin
-The main architectural difference is that this plugin has a more complicated service layer
-that handles more complex data structures that were unable to be passed directly via JSON.
-
