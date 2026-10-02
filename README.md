@@ -11,7 +11,8 @@ This plugin is a prototype wallet-level implementation of Quantumroot.
  # Warning
 
 Please understand this work is only developer tested and relies on [Quantumroot](https://github.com/bitjson/quantumroot), a
-novel and unaudited Quantum crypto solution.
+novel and unaudited Quantum crypto solution, and threrefore: YOU SHOULD USE THIS ONLY WITH SMALL AMOUNTS OF MONEY.
+
 # FAQ:  
 
 
