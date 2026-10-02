@@ -1,10 +1,10 @@
 {
-    "display_name": "Libauth",
+    "display_name": "Quantumroot",
     "version": "1.0",
-    "description": "Prototype Libauth Integration",
+    "description": "Prototype Quantumroot Integration",
     "project_url": "https://electroncash.org/",
     "minimum_ec_version": "4.0",
-    "package_name": "libauth_plugin",
+    "package_name": "quantumroot_plugin",
     "available_for": [
         "qt"
     ]

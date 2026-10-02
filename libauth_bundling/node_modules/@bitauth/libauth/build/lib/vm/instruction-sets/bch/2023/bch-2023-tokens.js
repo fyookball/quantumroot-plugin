@@ -1,0 +1,238 @@
+import { binToHex, flattenBinArray, formatError, } from '../../../../format/format.js';
+import { AuthenticationErrorCommon, pushToStack, pushToStackChecked, pushToStackVmNumber, useTransactionOutput, useTransactionUtxo, } from '../../common/common.js';
+import { ConsensusBch2023 } from './bch-2023-consensus.js';
+/**
+ * Given a list of transaction inputs, extract a hex-encoded list of all
+ * {@link Input.outpointTransactionHash}es from inputs that spend output `0` of
+ * that transaction (i.e. where {@link Input.outpointIndex} is `0`).
+ * @param inputs - a list of transaction inputs
+ * @returns a hex-encoded list of {@link Input.outpointTransactionHash}es
+ */
+export const extractGenesisCategories = (inputs) => inputs.reduce((agg, input) => input.outpointIndex === 0
+    ? [...agg, binToHex(input.outpointTransactionHash)]
+    : agg, []);
+/**
+ * Given the resolved list of a transaction's source outputs – the Unspent
+ * Transaction Outputs (UTXOs) spent by the transaction, extract all token data
+ * for token-aware validation. See CHIP-2022-02-CashTokens for details.
+ * @param sourceOutputs - a list of resolved source outputs (UTXOs)
+ * @returns an object containing `availableImmutableTokens`,
+ * `availableMutableTokensByCategory`, `availableSumsByCategory`, and
+ * `inputMintingCategories`. See CHIP-2022-02-CashTokens for details.
+ */
+export const extractSourceOutputTokenData = (sourceOutputs) => sourceOutputs.reduce(
+// eslint-disable-next-line complexity
+(agg, sourceOutput) => {
+    if (sourceOutput.token === undefined)
+        return agg;
+    const categoryHex = binToHex(sourceOutput.token.category);
+    return {
+        availableImmutableTokens: [
+            ...agg.availableImmutableTokens,
+            ...(sourceOutput.token.nft?.capability === 'none'
+                ? [
+                    {
+                        categoryHex: binToHex(sourceOutput.token.category),
+                        commitmentHex: binToHex(sourceOutput.token.nft.commitment),
+                    },
+                ]
+                : []),
+        ],
+        availableMutableTokensByCategory: sourceOutput.token.nft?.capability === 'mutable'
+            ? {
+                ...agg.availableMutableTokensByCategory,
+                [categoryHex]: (agg.availableMutableTokensByCategory[categoryHex] ?? 0) + 1,
+            }
+            : agg.availableMutableTokensByCategory,
+        availableSumsByCategory: {
+            ...agg.availableSumsByCategory,
+            [categoryHex]: (agg.availableSumsByCategory[categoryHex] ?? 0n) +
+                sourceOutput.token.amount,
+        },
+        inputMintingCategories: [
+            ...agg.inputMintingCategories,
+            ...(sourceOutput.token.nft?.capability === 'minting'
+                ? [binToHex(sourceOutput.token.category)]
+                : []),
+        ],
+    };
+}, {
+    availableImmutableTokens: [],
+    availableMutableTokensByCategory: {},
+    availableSumsByCategory: {},
+    inputMintingCategories: [],
+});
+/**
+ * Given a transaction's outputs, extract all token data for token-aware
+ * validation. See CHIP-2022-02-CashTokens for details.
+ * @param outputs - a list of transaction outputs
+ * @returns an object containing `outputImmutableTokens`,
+ * `outputMintingCategories`, `outputMutableTokensByCategory`, and
+ * `outputSumsByCategory`. See CHIP-2022-02-CashTokens for details.
+ */
+export const extractTransactionOutputTokenData = (outputs) => outputs.reduce(
+// eslint-disable-next-line complexity
+(agg, output) => {
+    if (output.token === undefined)
+        return agg;
+    const categoryHex = binToHex(output.token.category);
+    return {
+        outputImmutableTokens: [
+            ...agg.outputImmutableTokens,
+            ...(output.token.nft?.capability === 'none'
+                ? [
+                    {
+                        categoryHex: binToHex(output.token.category),
+                        commitmentHex: binToHex(output.token.nft.commitment),
+                    },
+                ]
+                : []),
+        ],
+        outputMintingCategories: [
+            ...agg.outputMintingCategories,
+            ...(output.token.nft?.capability === 'minting'
+                ? [binToHex(output.token.category)]
+                : []),
+        ],
+        outputMutableTokensByCategory: output.token.nft?.capability === 'mutable'
+            ? {
+                ...agg.outputMutableTokensByCategory,
+                [categoryHex]: (agg.outputMutableTokensByCategory[categoryHex] ?? 0) + 1,
+            }
+            : agg.outputMutableTokensByCategory,
+        outputSumsByCategory: {
+            ...agg.outputSumsByCategory,
+            [categoryHex]: (agg.outputSumsByCategory[categoryHex] ?? 0n) + output.token.amount,
+        },
+    };
+}, {
+    outputImmutableTokens: [],
+    outputMintingCategories: [],
+    outputMutableTokensByCategory: {},
+    outputSumsByCategory: {},
+});
+/**
+ * Given a transaction and its resolved source outputs – the Unspent Transaction
+ * Outputs (UTXOs) it spends – verify that the transaction passes token-aware
+ * validation.
+ * @param transaction - the transaction to verify
+ * @param sourceOutputs - the resolved list of the transaction's source outputs
+ * @returns `true` on success, or an error message (string) on failure.
+ */
+// eslint-disable-next-line complexity
+export const verifyTransactionTokens = (transaction, sourceOutputs, { maximumTokenCommitmentLength }) => {
+    const excessiveCommitment = [...sourceOutputs, ...transaction.outputs].find((output) => output.token?.nft?.commitment !== undefined &&
+        output.token.nft.commitment.length > maximumTokenCommitmentLength);
+    if (excessiveCommitment !== undefined) {
+        return formatError(AuthenticationErrorCommon.tokenValidationExcessiveCommitmentLength, `A token commitment exceeds the consensus limit of ${maximumTokenCommitmentLength} bytes. Excessive token commitment length: ${
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        excessiveCommitment.token.nft.commitment.length}`);
+    }
+    const genesisCategories = extractGenesisCategories(transaction.inputs);
+    const { availableSumsByCategory, availableMutableTokensByCategory, inputMintingCategories, availableImmutableTokens, } = extractSourceOutputTokenData(sourceOutputs);
+    const { outputSumsByCategory, outputMutableTokensByCategory, outputMintingCategories, outputImmutableTokens, } = extractTransactionOutputTokenData(transaction.outputs);
+    const availableMintingCategories = [
+        ...genesisCategories,
+        ...inputMintingCategories,
+    ];
+    const missingMintingCategory = outputMintingCategories.find((category) => !availableMintingCategories.includes(category));
+    if (missingMintingCategory !== undefined) {
+        return formatError(AuthenticationErrorCommon.tokenValidationInvalidMintingToken, `Invalid output minting token category: ${missingMintingCategory}`);
+    }
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const [categoryHex, sum] of Object.entries(outputSumsByCategory)) {
+        if (sum > BigInt(ConsensusBch2023.maximumFungibleTokenAmount)) {
+            return formatError(AuthenticationErrorCommon.tokenValidationExcessiveAmount, `Category: ${categoryHex}, total amount: ${sum.toString()}. Consensus maximum amount: ${ConsensusBch2023.maximumFungibleTokenAmount}`);
+        }
+        const availableSum = availableSumsByCategory[categoryHex];
+        if (availableSum === undefined &&
+            sum > 0 &&
+            !genesisCategories.includes(categoryHex)) {
+            return formatError(AuthenticationErrorCommon.tokenValidationInvalidFungibleMint, `Category: ${categoryHex}, tokens created: ${sum}`);
+        }
+        if (availableSum !== undefined && sum > availableSum) {
+            return formatError(AuthenticationErrorCommon.tokenValidationOutputsExceedInputs, `Category: ${categoryHex}, input amount: ${availableSum}, output amount: ${sum}`);
+        }
+    }
+    const remainingMutableTokens = Object.entries(outputMutableTokensByCategory).reduce((agg, [categoryHex, sum]) => {
+        if (availableMintingCategories.includes(categoryHex)) {
+            return agg;
+        }
+        return { ...agg, [categoryHex]: (agg[categoryHex] ?? 0) - sum };
+    }, availableMutableTokensByCategory);
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const [categoryHex, sum] of Object.entries(remainingMutableTokens)) {
+        if (sum < 0) {
+            return formatError(AuthenticationErrorCommon.tokenValidationExcessiveMutableTokens, `Category: ${categoryHex}, excess mutable tokens: ${0 - sum}`);
+        }
+    }
+    const { unmatchedImmutableTokens } = outputImmutableTokens.reduce((agg, token) => {
+        const { categoryHex, commitmentHex } = token;
+        if (availableMintingCategories.includes(categoryHex)) {
+            return agg;
+        }
+        const firstMatch = availableImmutableTokens.findIndex((available) => available.categoryHex === categoryHex &&
+            available.commitmentHex === commitmentHex);
+        if (firstMatch === -1) {
+            return {
+                availableImmutableTokens: agg.availableImmutableTokens,
+                unmatchedImmutableTokens: [...agg.unmatchedImmutableTokens, token],
+            };
+        }
+        // eslint-disable-next-line functional/no-expression-statements, functional/immutable-data
+        agg.availableImmutableTokens.splice(firstMatch, 1);
+        return agg;
+    }, {
+        availableImmutableTokens,
+        unmatchedImmutableTokens: [],
+    });
+    const requiredMutableTokens = unmatchedImmutableTokens.reduce((agg, token) => ({
+        ...agg,
+        [token.categoryHex]: (agg[token.categoryHex] ?? 0) + 1,
+    }), {});
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const [categoryHex, required] of Object.entries(requiredMutableTokens)) {
+        const available = remainingMutableTokens[categoryHex] ?? 0;
+        if (available < required) {
+            return formatError(AuthenticationErrorCommon.tokenValidationExcessiveImmutableTokens, `Category ${categoryHex}, available mutable tokens: ${available}, new immutable tokens: ${required}`);
+        }
+    }
+    return true;
+};
+export const pushTokenExtendedCategory = (state, utxo) => {
+    const { token } = utxo;
+    if (token === undefined) {
+        return pushToStackVmNumber(state, 0n);
+    }
+    const capabilityByte = token.nft?.capability === 'minting'
+        ? [2 /* Constants.mintingCapabilityByte */]
+        : token.nft?.capability === 'mutable'
+            ? [1 /* Constants.mutableCapabilityByte */]
+            : [];
+    const extendedCategory = flattenBinArray([
+        token.category.slice().reverse(),
+        Uint8Array.from(capabilityByte),
+    ]);
+    return pushToStack(state, [extendedCategory]);
+};
+export const pushTokenCommitment = (state, utxo) => {
+    const { token } = utxo;
+    if (token?.nft === undefined) {
+        return pushToStackVmNumber(state, 0n);
+    }
+    return pushToStackChecked(state, token.nft.commitment);
+};
+export const pushTokenAmount = (state, utxo) => {
+    const { token } = utxo;
+    if (token === undefined) {
+        return pushToStackVmNumber(state, 0n);
+    }
+    return pushToStackVmNumber(state, token.amount);
+};
+export const opUtxoTokenCategory = (state) => useTransactionUtxo(state, (nextState, [utxo]) => pushTokenExtendedCategory(nextState, utxo));
+export const opUtxoTokenCommitment = (state) => useTransactionUtxo(state, (nextState, [utxo]) => pushTokenCommitment(nextState, utxo));
+export const opUtxoTokenAmount = (state) => useTransactionUtxo(state, (nextState, [utxo]) => pushTokenAmount(nextState, utxo));
+export const opOutputTokenCategory = (state) => useTransactionOutput(state, (nextState, [output]) => pushTokenExtendedCategory(nextState, output));
+export const opOutputTokenCommitment = (state) => useTransactionOutput(state, (nextState, [output]) => pushTokenCommitment(nextState, output));
+export const opOutputTokenAmount = (state) => useTransactionOutput(state, (nextState, [output]) => pushTokenAmount(nextState, output));
+//# sourceMappingURL=bch-2023-tokens.js.map

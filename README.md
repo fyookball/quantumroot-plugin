@@ -1,62 +1,83 @@
-# Js-Libauth-Integration-Plugin 
+# Quantumroot Vault Plugin
 
-This plugin is a prototype bridge between Electron Cash and javascript/Libauth 
-using an embedded Node binary.  It is intended as a boilerplate for
-developers to create plugin applications that require either Libauth
-or javascript in general.
+This plugin is a prototype wallet-level implementation of Quantumroot.
 
-Please consider this work to be minimally tested and possibly incomplete.
-Use with your own discretion and due dilligence.
+# Warning
 
-# Overview
+Please consider this work to be minimally tested and possibly insecure.
+Only use with small amounts of test funds.
 
-The plugin has two functions.  First, it provides a persistent Node.js instance
-with libauth, and secondarily: a "one-off" js runner.
 
-For the main Libauth functionality, the plugin starts a Node.js subprocess which runs `scripts/libauth_service.bundle.mjs`.  You can then
-make as many calls as you want to various libauth functions.  Theoretically, any calls will work,
-even if they are in different threads.
+![image](https://github.com/fyookball/quantumroot-vault/blob/main/quantumroot-vault.png)
 
-For the secondary function, see "JS" section below.
+ 
+# FAQ:  
 
-Other than the embedded binaries, the plugin is lightweight.  There are intentionally no wrapper functions.
-Instead, you can call any Libauth function, but the developer is responsible for understanding
-each call's input and output types. 
 
-Be aware of particuarly heavy calls to Libauth, because they could hang Electron Cash's GUI
-thread if not well managed.  (This is more of a general programming tip.)
+## What is this?
 
-# JSON and type markers
+It's a "plugin" for Electron Cash.  A plugin is a software add on.  In this case,
+its for the quantumroot vault.  In general, never load plugins unless you are
+sure they are from reputable developers.  To load the plugin, go to "Tools"
+and then "Installed Plugins" from the Electron Cash menu, and then load
+the zip file directly from your comptuer.
 
-Transport between python and js is done via stdin/stdout with JSON as the wire protocol.  The developer
-must specify "hexbytes" or "bigint" markers when passing data from python to javascript within the plugin code
-(qt.py).  When retrieving data back, the service layer deals with typing, so nothing special is required
-as long as you understand the shape of the data being returned, as it's represented in JSON. 
 
-Hopefully the example calls in qt.py make everything clear. 
 
-# Integrating with JS (without Libauth)
+## What's the point of this?
 
-The secondary function of this plugin is run any js file.  It is similar to the Libauth usage
-in terms of JSON in, JSON out, but the node instance is not meant to persist in this
-case.  The node spins up, runs the script, and exits gracefully. 
-Theoretically, you could build a persistent node and get it to work with any arbitrary
-js script, but that would be outside of the initial scope of the project.
+If/When Quantum computer become a threat, you can use the vault technology to better secure your coins.
 
-There is a hello.js call as an example.
+## How to use it, in a nutshell?
 
-# UI not included
+It's pretty simple.  The vault plugin will give you a quantum-safe BitcoinCash address to use and receive funds.
+To spend from it, just use the send button in the plugin tab.  One more thing though: To use your vault, you need
+to first create using the button on the tab. (Behind the scenes, this actually creates an NFT! ) 
+To do this, You'll need a "vout 0" coin with sufficient sats.  In simple terms, 
+that just means you need funds in your wallet to boostrap the vault.
 
-There is a new wallet tab created, as is the custom for most plugins, but it
-is intentionally blank.
 
-# What does this plugin do out of the box?
+## How does wallet recovery work?
 
-The plugin will run several test calls to Libauth and one custom JS call to a "hello" script
-and print the output to the console.
+A: The vault is tied to your XPRV, so if you restore a wallet, the plugin will detect your vault password NFT
+by scanning all history transaction to see if any made a "quantumroot" (literal commitment string) NFT.
 
-![image](https://github.com/fyookball/js-libauth-integration-plugin/blob/main/libauth-plugin.png)
+## Do I only get one vault address?
 
+Yes, one vault address per wallet, for now.  It's technically possible to add more addresses in
+future versions like a "normal" wallet.  For now,  let's prove the concept of a quantum wallet first.
+
+## What happens with change from my transaction?
+
+Change goes back to the single vault address.
+
+## How does it all work on a basic technical level?
+
+Creating the vault involves minting an NFT which is identified by its category.  Each time you spend,
+you mint a fresh NFT of that category, and these represent a rotating procession of quantum locks. 
+The receive address of your vault is not the NFT address, which is a seperate UTXO.  So in a spend,
+you'll see one or more UTXOs of your vault address plus the NFT as inputs, and the outputs will be
+a destination, change (your vault address again), and the new NFT "baton" for your vault.  Each time you're spending, the quantum lock NFT effectively rotates to a new key.
+
+## What happens if I accidentally burn the NFT of my vault?
+
+You shouldn't be able to "accidentally" do this.  Technically, if it did happen, your coins
+would be gone.  However,  wallets that are not aware of Quantumroot will not be able to construct and spend the NFT. 
+For exmample, the vault NFT will not even be visible in Electron Cash's token tabs. Developers working on this
+or a similar tool do need to be aware and pay attention and avoid critical bugs, as with any wallet software.
+
+## What about the fancy features of Quantumroot?
+
+This plugin makes use of the Quantumroot introspection spend, to spend multiple UTXO at the same address while keeping the transaction size small.
+
+## What about the stuff on the Quantumroot page like "quantum safe at rest from day 1" and "retiring pre-quantum signing". 
+
+This simply means you can also technically spend from the vaults with normal Schnorr signatures if you really want to, or hide that you're using quantum
+under a script hash.  But this complication does not add value in this setting becuase you still need to put your funds in the vault.
+ 
+
+# How to Load the Plugin
+First download the plugin from the Releases section.  Then, from the Electron Cash menu, select Tools->Installed Plugins, then click "Add Plugin" and load the zip file.
 
 # How to Develop and Rebuild the Plugin
 
@@ -77,24 +98,15 @@ to rebuild the libauth bundle with
 
 This will generate `libauth_bundling/libauth_service.bundle.mjs`.
 Then you should copy this file from the bundling folder and
-put it into the plugin scripts folder at `libauth_plugin/scripts/libauth_service.bundle.mjs`.
-
-Your main development work will be in `libuath_plugin/qt.py`.  You can 
-follow the examples and add your own Libauth calls.
+put it into the plugin scripts folder at `quantumroot-plugin/scripts/libauth_service.bundle.mjs`.
+ 
 
 When you're ready to compile the plugin, just zip it together from
 the top level folder with 
 
 `zip -r quantumroot_plugin.zip manifest.json quantumroot_plugin`
-
-Any one-off custom javascript files can simply be put in `libauth_plugin/scripts`,
-on the same level as hello.js.
-
-# Node.js
-
-Node version 22 is used because this is the last version that provides
-win32 binaries (Electron Cash windows still runs on 32 bits). In theory,
-different Node versions could be used for each platform.
-
-
+ 
+Note: The plugin uses the libauth plugin as a basis. See: https://github.com/fyookball/js-libauth-integration-plugin
+The main architectural difference is that this plugin has a more complicated service layer
+that handles more complex data structures that were unable to be passed directly via JSON.
 

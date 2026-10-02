@@ -1,0 +1,3 @@
+declare const _default: [["Basic push operations", [["OP_0", "OP_SIZE <0> OP_EQUAL OP_NIP", "OP_0 (A.K.A. OP_PUSHBYTES_0, OP_FALSE): zero is represented by an empty stack item"], ...(import("../bch-vmb-test-utils.js").VmbTestDefinition | ["", "OP_0 OP_NOT", "OP_0 in locking bytecode, OP_NOT"] | ["OP_PUSHBYTES_1", "OP_SIZE <1> OP_EQUAL OP_NIP", "OP_PUSHBYTES_1 with missing byte", readonly ["invalid"]])[]]]];
+export default _default;
+//# sourceMappingURL=core.push.bytes.d.ts.map

@@ -1,0 +1,22 @@
+import type { AuthenticationProgramStateAlternateStack, AuthenticationProgramStateError, AuthenticationProgramStateStack } from '../../../lib.js';
+export declare const opToAltStack: <State extends AuthenticationProgramStateAlternateStack & AuthenticationProgramStateStack>(state: State) => State;
+export declare const opFromAltStack: <State extends AuthenticationProgramStateAlternateStack & AuthenticationProgramStateError & AuthenticationProgramStateStack>(state: State) => State;
+export declare const op2Drop: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const op2Dup: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const op3Dup: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const op2Over: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const op2Rot: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const op2Swap: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const opIfDup: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const opDepth: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const opDrop: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const opDup: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const opNip: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const opOver: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const opPick: <State extends AuthenticationProgramStateError & AuthenticationProgramStateStack>(state: State) => State;
+export declare const opRoll: <State extends AuthenticationProgramStateError & AuthenticationProgramStateStack>(state: State) => State;
+export declare const opRot: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const opSwap: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const opTuck: <State extends AuthenticationProgramStateStack>(state: State) => State;
+export declare const opSize: <State extends AuthenticationProgramStateStack>(state: State) => State;
+//# sourceMappingURL=stack.d.ts.map

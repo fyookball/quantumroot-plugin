@@ -1,0 +1,222 @@
+import type { AuthenticationInstruction, Output, TransactionCommon } from '../lib.js';
+export type AuthenticationProgramStackFrame = {
+    /**
+     * The full list of instructions to be evaluated by the virtual machine.
+     */
+    instructions: AuthenticationInstruction[];
+    /**
+     * Instruction Pointer – the array index of `instructions` that will be read
+     * to identify the next instruction. Once `ip` exceeds the last index of
+     * `instructions` (`ip === instructions.length`), evaluation is complete.
+     */
+    ip: number;
+};
+export type AuthenticationProgramStateMinimum = AuthenticationProgramStackFrame & {
+    /**
+     * An object containing metrics that persist and accumulate over all phases of
+     * evaluating an input – unlocking, locking and (for P2SH) redeem bytecode.
+     */
+    metrics: {
+        /**
+         * A count of instructions evaluated over the course of verifying
+         * the input, included unexecuted instructions.
+         */
+        evaluatedInstructionCount: number;
+    };
+};
+export type AuthenticationProgramStateStack<StackType = Uint8Array> = {
+    /**
+     * The stack is the primary workspace of the virtual machine. Most virtual
+     * machine operations create, read, update, or delete bytecode values
+     * held on the stack.
+     */
+    stack: StackType[];
+    metrics: {
+        /**
+         * The cumulative byte count of all items pushed to the stack over the
+         * course of verifying the input.
+         */
+        stackPushedBytes: number;
+    };
+};
+export type AuthenticationProgramStateAlternateStack<StackType = Uint8Array> = {
+    /**
+     * The "alternate stack" is separate stack on which `OP_TOALTSTACK` and
+     * `OP_FROMALTSTACK` operate in bitcoin virtual machines.
+     */
+    alternateStack: StackType[];
+};
+export type AuthenticationProgramStateFunctionTable = {
+    /**
+     * The table of functions (in Forth parlance, "vocabulary of words") defined
+     * over the course of the evaluation.
+     */
+    functionTable: {
+        [hex: string]: Uint8Array;
+    };
+    /**
+     * The count of defined functions ("words") in the current evaluation.
+     */
+    functionCount: number;
+};
+export type AuthenticationProgramStateControlStack<ItemType = AuthenticationProgramStackFrame | boolean | number> = {
+    /**
+     * An array representing the current execution status of the program. This
+     * allows the state to track nested conditional branches, loops, and
+     * evaluation operations (`OP_EVAL`).
+     *
+     * The `OP_IF` and `OP_NOTIF` operations push a new boolean onto the
+     * `controlStack`, `OP_ELSE` flips the top boolean, and `OP_ENDIF` removes
+     * the top boolean from the `controlStack`.
+     *
+     * Other instructions are only evaluated if `controlStack` contains no
+     * `false` items.
+     *
+     * A.K.A. `vfExec` in the C++ implementation.
+     */
+    controlStack: ItemType[];
+};
+export type AuthenticationProgramStateError = {
+    /**
+     * If present, the error returned by the most recent virtual machine
+     * operation.
+     */
+    error?: string;
+};
+/**
+ * A complete view of the information necessary to validate a transaction.
+ */
+export type ResolvedTransactionCommon = {
+    sourceOutputs: Output[];
+    transaction: TransactionCommon;
+};
+/**
+ * A complete view of the information necessary to validate a specified input in
+ * a transaction.
+ */
+export type AuthenticationProgramCommon = ResolvedTransactionCommon & {
+    inputIndex: number;
+};
+export type AuthenticationProgramStateCodeSeparator = {
+    /**
+     * The `lastCodeSeparator` indicates the index of the most recently executed
+     * `OP_CODESEPARATOR` instruction. In each of the signing serialization
+     * algorithms, the `instructions` are sliced at `lastCodeSeparator`, and the
+     * subarray is re-encoded. The resulting bytecode is called the
+     * `coveredBytecode` (A.K.A. `scriptCode`), and is part of the data hashed to
+     * create the signing serialization digest.
+     *
+     * By default, this is `-1`, which indicates that the whole `instructions`
+     * array is included in the signing serialization.
+     */
+    lastCodeSeparator: number;
+};
+export type AuthenticationProgramStateSignatureAnalysis = {
+    /**
+     * An array of the `Uint8Array` values used in signature verification over the
+     * course of this program. Each raw signing serialization and data signature
+     * message should be pushed to this array in the order it was computed.
+     *
+     * This property is not used within any {@link AuthenticationVirtualMachine},
+     * but it is provided in the program state to assist with analysis. Because
+     * these messages must always be computed and hashed during evaluation,
+     * recording them in the state does not meaningfully affect performance.
+     */
+    signedMessages: ({
+        /**
+         * The final digest signed by the signature. Because this is a
+         * transaction signature, the provided `serialization` is hashed using
+         * two rounds of sha256 to produce this digest.
+         */
+        digest: Uint8Array;
+        /**
+         * The transaction signing serialization generated by the `OP_CHECKSIG`
+         * or `OP_CHECKSIGVERIFY` operation.
+         */
+        serialization: Uint8Array;
+    } | {
+        /**
+         * The final digest signed by the signature. Because this is a data
+         * signature, the provided `message` is hashed using one round of sha256
+         * to produce this digest.
+         */
+        digest: Uint8Array;
+        /**
+         * The message provided to the `OP_CHECKDATASIG` or
+         * `OP_CHECKDATASIGVERIFY` operation.
+         */
+        message: Uint8Array;
+    })[];
+};
+export type AuthenticationProgramStateResourceLimits = {
+    /**
+     * A count of non-push operations (and `OP_RESERVED` operations) executed
+     * since the active bytecode began execution, i.e. this count resets to
+     * `0` prior to P2SH redeem bytecode evaluation.
+     *
+     * Prior to BCH_2025_05, operation count (A.K.A. "nOpCount") is limited to 201
+     * operations (A.K.A. "MAX_OPS_PER_SCRIPT"). Following BCH_2025_05, operation
+     * count is replaced by other limits and no longer requires tracking.
+     */
+    operationCount: number;
+    metrics: {
+        /**
+         * The cumulative operation cost contributed by arithmetic operations
+         * executed over the course of verifying the input.
+         */
+        arithmeticCost: number;
+        /**
+         * The count of functions defined over the course of the evaluation. This
+         * count is reset – along with the function table – before evaluating the
+         * locking bytecode. (Note, VMs which disallow non-push unlocking bytecode
+         * may omit the reset behavior and instead rely on OP_DEFINE's invalidity in
+         * unlocking bytecode.)
+         */
+        definedFunctions: number;
+        /**
+         * An unsigned integer counter use to count the total number of hash
+         * digest iterations required to validate the input.
+         */
+        hashDigestIterations: number;
+        /**
+         * The maximum allowable `operationCost` given `densityControlLength`.
+         */
+        maximumOperationCost: number;
+        /**
+         * The maximum allowable `hashDigestIterations`
+         * given `densityControlLength`.
+         */
+        maximumHashDigestIterations: number;
+        /**
+         * The maximum allowable `signatureCheckCount` for this evaluation.
+         */
+        maximumSignatureCheckCount: number;
+        /**
+         * The approximated input length for use in determining limits. Note that
+         * this is not the actual encoded length of the input, but rather, a
+         * fixed formula of `41 + unlockingBytecode.length`.
+         */
+        densityControlLength: number;
+        /**
+         * The cumulative cost of all operations executed over the course of
+         * verifying the input, including `arithmeticCost`, `stackPushedBytes`,
+         * base instruction costs (derived from `executedInstructionCount`), hashing
+         * costs (from `hashDigestIterations`), and signature checking costs
+         * (from `signatureCheckCount`).
+         */
+        operationCost: number;
+        /**
+         * A count of signature checks (A.K.A. "SigChecks") performed over the
+         * course of the entire evaluation as defined by the `BCH_2020_05` upgrade.
+         *
+         * Signature checks replaced the earlier Signature Operations (A.K.A.
+         * "SigOps") system of limits.
+         */
+        signatureCheckCount: number;
+    };
+};
+export type AuthenticationProgramStateTransactionContext = {
+    program: AuthenticationProgramCommon;
+};
+export type AuthenticationProgramStateCommon = AuthenticationProgramStateAlternateStack & AuthenticationProgramStateCodeSeparator & AuthenticationProgramStateControlStack & AuthenticationProgramStateError & AuthenticationProgramStateFunctionTable & AuthenticationProgramStateMinimum & AuthenticationProgramStateResourceLimits & AuthenticationProgramStateSignatureAnalysis & AuthenticationProgramStateStack & AuthenticationProgramStateTransactionContext;
+//# sourceMappingURL=vm-types.d.ts.map

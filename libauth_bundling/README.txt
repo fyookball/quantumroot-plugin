@@ -6,6 +6,4 @@ After modifying the service file, you must rebuild the libauth bundle with this 
 npx rollup -c rollup.worker.config.mjs
 
 Finally, you must copy the newly generated libauth_service.bundle.mjs into libauth_plugin/scripts
-before rebuilding the entire plugin from the libauth_plugin folder with:  
-
-zip -r libauth_plugin.zip manifest.json libauth_plugin
+before rebuilding the entire plugin.
