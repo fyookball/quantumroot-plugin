@@ -6,7 +6,7 @@ import copy
 import pkgutil
 
 from electroncash.i18n import _
-from electroncash import wallet 
+from electroncash import wallet
 from electroncash_gui.qt.util import ButtonsLineEdit, MyTreeWidget, MessageBoxMixin
 from .mint import MintNftDialog
 from .vault import QuantumrootVault
@@ -27,17 +27,25 @@ class Ui(MyTreeWidget, MessageBoxMixin):
         self.quantumroot_transaction_planner = QuantumrootTransactionPlanner(self.quantumroot_vault)
         self.quantumroot_template = self.plugin.quantumroot_load_template()
 
+        # ------------------------------------------------------------------
+        # Main layout
+        # ------------------------------------------------------------------
+
         layout = QVBoxLayout()
-        layout.setContentsMargins(18, 12, 18, 12)
-        layout.setSpacing(10)
+        layout.setContentsMargins(16, 8, 16, 8)
+        layout.setSpacing(6)
         self.setLayout(layout)
 
+        # ------------------------------------------------------------------
+        # Compact header
+        # ------------------------------------------------------------------
+
         header_row = QHBoxLayout()
-        header_row.setContentsMargins(4, 2, 4, 4)
-        header_row.setSpacing(12)
+        header_row.setContentsMargins(4, 0, 4, 2)
+        header_row.setSpacing(10)
 
         self.logo_label = QLabel()
-        self.logo_label.setFixedSize(100, 100)
+        self.logo_label.setFixedSize(64, 64)
         self.logo_label.setAlignment(Qt.AlignCenter)
 
         try:
@@ -52,19 +60,20 @@ class Ui(MyTreeWidget, MessageBoxMixin):
                 raise RuntimeError("Unable to decode logo image.")
 
             self.logo_label.setPixmap(
-                logo_pixmap.scaled(82, 82, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                logo_pixmap.scaled(54, 54, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             )
 
         except Exception as e:
             print("[quantumroot-ui] unable to load logo:", str(e))
 
-        header_row.addWidget(self.logo_label, 0, Qt.AlignTop)
+        header_row.addWidget(self.logo_label, 0, Qt.AlignVCenter)
 
         header_text = QVBoxLayout()
-        header_text.setSpacing(2)
+        header_text.setContentsMargins(0, 0, 0, 0)
+        header_text.setSpacing(1)
 
         title = QLabel(
-            "<span style='font-size: 20px; font-weight: 600;'>"
+            "<span style='font-size: 18px; font-weight: 600;'>"
             "Quantumroot Vault"
             "</span>"
         )
@@ -80,19 +89,24 @@ class Ui(MyTreeWidget, MessageBoxMixin):
 
         header_row.addLayout(header_text)
         header_row.addStretch()
+
         layout.addLayout(header_row)
+
+        # ------------------------------------------------------------------
+        # Vault information
+        # ------------------------------------------------------------------
 
         self.info_box = QGroupBox(_("Your Vault"))
         self.info_box.setStyleSheet(
             "QGroupBox {"
             "  border: 1px solid #b8c9dc;"
             "  border-radius: 6px;"
-            "  margin-top: 12px;"
-            "  padding-top: 10px;"
+            "  margin-top: 9px;"
+            "  padding-top: 7px;"
             "}"
             "QGroupBox::title {"
             "  subcontrol-origin: margin;"
-            "  left: 12px;"
+            "  left: 10px;"
             "  padding: 0 5px;"
             "  color: #245b8f;"
             "  font-weight: 600;"
@@ -100,50 +114,54 @@ class Ui(MyTreeWidget, MessageBoxMixin):
         )
 
         info_layout = QVBoxLayout(self.info_box)
-        info_layout.setContentsMargins(18, 16, 18, 14)
-        info_layout.setSpacing(7)
+        info_layout.setContentsMargins(14, 11, 14, 10)
+        info_layout.setSpacing(5)
+
+        # Status and Refresh share one row to save vertical space.
+        status_row = QHBoxLayout()
+        status_row.setContentsMargins(0, 0, 0, 0)
+        status_row.setSpacing(10)
 
         self.vault_status_label = QLabel(_("You haven't created the vault yet."))
         self.vault_status_label.setWordWrap(True)
-        self.vault_status_label.setStyleSheet(
-            "font-size: 18px; font-weight: 600;"
-            "padding: 3px 0 5px 0;"
-        )
-        info_layout.addWidget(self.vault_status_label)
+        self.vault_status_label.setStyleSheet("font-size: 15px; font-weight: 600;")
+        status_row.addWidget(self.vault_status_label, 1)
 
+        self.refresh_button = QPushButton(_("Refresh"))
+        self.refresh_button.setFixedSize(90, 30)
+        self.refresh_button.setToolTip(_("Refresh Quantumroot vault information"))
+        self.refresh_button.clicked.connect(self.refresh_quantumroot)
+        status_row.addWidget(self.refresh_button, 0, Qt.AlignRight)
+
+        info_layout.addLayout(status_row)
+
+        # Keep this label for compatibility with the existing refresh logic,
+        # but the compact UI does not need a separate address-introduction row.
         self.vault_address_intro_label = QLabel(_("Your vault address is"))
-        self.vault_address_intro_label.setWordWrap(True)
-        self.vault_address_intro_label.setStyleSheet("padding-top: 3px;")
         self.vault_address_intro_label.setVisible(False)
-        info_layout.addWidget(self.vault_address_intro_label)
 
         self.receive_address_label = ButtonsLineEdit("")
         self.receive_address_label.setReadOnly(True)
         self.receive_address_label.addCopyButton()
         self.receive_address_label.setVisible(False)
         info_layout.addWidget(self.receive_address_label)
-        
-        refresh_row = QHBoxLayout()
-        refresh_row.addStretch()
 
-        self.refresh_button = QPushButton(_("Refresh"))
-        self.refresh_button.setFixedSize(100, 34)
-        self.refresh_button.setToolTip(_("Refresh Quantumroot vault information")) 
-        self.refresh_button.clicked.connect(self.refresh_quantumroot)
-        refresh_row.addWidget(self.refresh_button)
-        info_layout.addLayout(refresh_row)
         layout.addWidget(self.info_box)
 
+        # ------------------------------------------------------------------
+        # Main actions
+        # ------------------------------------------------------------------
+
         action_row = QHBoxLayout()
-        action_row.setContentsMargins(16, 8, 16, 0)
+        action_row.setContentsMargins(12, 4, 12, 0)
         action_row.setSpacing(12)
 
         self.mint_nft_button = QPushButton(_("Create Vault"))
-        self.mint_nft_button.setMinimumHeight(50)
-        self.mint_nft_button.setMinimumWidth(170)
+        self.mint_nft_button.setMinimumHeight(40)
+        self.mint_nft_button.setMinimumWidth(160)
         self.mint_nft_button.setStyleSheet(
             "QPushButton {"
-            "  padding: 8px 20px;"
+            "  padding: 6px 18px;"
             "  font-size: 14px;"
             "  font-weight: 600;"
             "}"
@@ -151,15 +169,15 @@ class Ui(MyTreeWidget, MessageBoxMixin):
         self.mint_nft_button.clicked.connect(self.open_mint_nft_dialog)
 
         self.send_button = QPushButton(_("Send"))
-        self.send_button.setMinimumHeight(50)
-        self.send_button.setMinimumWidth(170)
+        self.send_button.setMinimumHeight(40)
+        self.send_button.setMinimumWidth(160)
         self.send_button.setStyleSheet(
             "QPushButton {"
             "  background-color: #1473e6;"
             "  color: white;"
             "  border: 1px solid #0f65cc;"
             "  border-radius: 5px;"
-            "  padding: 8px 20px;"
+            "  padding: 6px 18px;"
             "  font-size: 14px;"
             "  font-weight: 600;"
             "}"
@@ -184,11 +202,18 @@ class Ui(MyTreeWidget, MessageBoxMixin):
 
         layout.addLayout(action_row)
 
+        # ------------------------------------------------------------------
+        # Initial vault state
+        # ------------------------------------------------------------------
+
         self.quantumroot_nft = self.find_quantumroot_nft()
         initialized = self.quantumroot_nft is not None
- 
+
         self.mint_nft_button.setEnabled(not initialized)
         self.send_button.setEnabled(initialized)
+
+        # Any extra vertical space belongs below the controls rather than
+        # between them, keeping the interface compact on smaller windows.
         layout.addStretch()
 
         if initialized:
@@ -266,6 +291,7 @@ class Ui(MyTreeWidget, MessageBoxMixin):
 
         print("[quantumroot-ui] found Quantumroot category:", entry["category"])
         return entry
+
     # The vault uses one deterministic receive address for BCH deposits and
     # change. It is always compiled as receive_address #0 using the vault's
     # CashTokens category and wallet key.
@@ -310,7 +336,7 @@ class Ui(MyTreeWidget, MessageBoxMixin):
         self.mint_nft_button.setEnabled(not initialized)
         self.send_button.setEnabled(initialized)
         self.refresh_vault_information()
-        
+
     def refresh_vault_information(self, show_errors=True):
         if self.quantumroot_nft is None:
             self.vault_status_label.setText(_("You haven't created the vault yet."))
@@ -358,15 +384,14 @@ class Ui(MyTreeWidget, MessageBoxMixin):
         )
 
         self.vault_address_intro_label.setText(_("Your vault address is"))
-        self.vault_address_intro_label.setVisible(True)
+        self.vault_address_intro_label.setVisible(False)
 
         self.receive_address_label.setText(result["address"])
         self.receive_address_label.setVisible(True)
 
-
     # The authorization NFT moves from quantum_lock #N to quantum_lock #(N+1)
     # after every successful vault spend. Walk the deterministic Quantum Locks
-    # from #0 until the current authorization NFT is found.  
+    # from #0 until the current authorization NFT is found.
     def discover_current_quantum_lock(self, max_index=1000):
         if self.quantumroot_nft is None:
             raise RuntimeError("Quantumroot vault is not initialized.")
@@ -409,6 +434,7 @@ class Ui(MyTreeWidget, MessageBoxMixin):
                 self.wallet.storage.write()
 
                 return current
+
             if not self.quantumroot_vault.has_history(compiled["lockingBytecode"]):
                 raise RuntimeError(
                     "Authorization NFT was not found while walking Quantum Locks. "
@@ -492,7 +518,7 @@ class Ui(MyTreeWidget, MessageBoxMixin):
             initialized = self.quantumroot_nft is not None
 
             self.mint_nft_button.setEnabled(not initialized)
-            self.send_button.setEnabled(initialized) 
+            self.send_button.setEnabled(initialized)
 
             if initialized:
                 self.refresh_vault_information(show_errors=False)
@@ -509,7 +535,7 @@ class Ui(MyTreeWidget, MessageBoxMixin):
             initialized = self.quantumroot_nft is not None
 
             self.mint_nft_button.setEnabled(not initialized)
-            self.send_button.setEnabled(initialized) 
+            self.send_button.setEnabled(initialized)
 
             if initialized:
                 self.refresh_vault_information(show_errors=False)
