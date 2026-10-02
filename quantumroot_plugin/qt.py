@@ -92,29 +92,27 @@ class Plugin(BasePlugin):
             return xprv_keystore.get_master_private_key(password)
         except InvalidPassword:
             raise RuntimeError("Incorrect wallet password.")
-
+            
     def quantumroot_load_template(self):
         """Load the Quantumroot authentication template from the plugin or plugin ZIP."""
-        module_path = os.path.abspath(__file__)
+        module_path = os.path.abspath(__file__).replace("\\", "/")
 
         if ".zip/" in module_path:
             zip_path, internal_path = module_path.split(".zip/", 1)
             zip_path += ".zip"
-            template_path = (
-                os.path.dirname(internal_path)
-                + "/quantumroot-schnorr-lm-ots-vault.json"
-            )
+            template_path = os.path.dirname(internal_path) + "/quantumroot-schnorr-lm-ots-vault.json"
+
             with zipfile.ZipFile(zip_path, "r") as archive:
                 template_bytes = archive.read(template_path)
+
             return json.loads(template_bytes.decode("utf-8"))
 
-        template_path = os.path.join(
-            os.path.dirname(module_path),
-            "quantumroot-schnorr-lm-ots-vault.json",
-        )
+        template_path = os.path.join(os.path.dirname(module_path), "quantumroot-schnorr-lm-ots-vault.json")
+
         with open(template_path, "r", encoding="utf-8") as template_file:
             return json.load(template_file)
-
+            
+                    
     def quantumroot_compile_script(
         self,
         template,
